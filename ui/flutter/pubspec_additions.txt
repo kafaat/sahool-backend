@@ -1,0 +1,9 @@
+# Add to pubspec.yaml dependencies:
+flutter_map: ^7.0.0
+latlong2: ^0.9.1
+dio: ^5.4.0
+provider: ^6.0.5
+fl_chart: ^0.69.0
+before_after: ^3.2.0
+pdf: ^3.11.0
+printing: ^5.13.0

@@ -1,0 +1,4 @@
+# Add these npm packages:
+npm i react-chartjs-2 chart.js
+npm i react-compare-image
+npm i jspdf

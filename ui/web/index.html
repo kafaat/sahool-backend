@@ -1,0 +1,108 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Sahool Web Map</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    #map { height: 100vh; }
+    .toolbar {
+      position: absolute; top: 10px; left: 10px; z-index: 999;
+      background: white; padding: 8px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.15);
+      font-family: sans-serif; display:flex; gap:6px; align-items:center;
+    }
+  </style>
+</head>
+<body>
+<div class="toolbar">
+  <select id="shape">
+    <option value="polygon">Polygon</option>
+    <option value="circle">Circle</option>
+    <option value="rectangle">Rectangle</option>
+    <option value="semicircle">Semi Circle</option>
+  </select>
+  <input id="radius" type="number" value="120" style="width:70px"/> m
+  <select id="direction">
+    <option value="up">Up</option><option value="down">Down</option>
+    <option value="left">Left</option><option value="right">Right</option>
+  </select>
+  <button id="save">Save Field</button>
+</div>
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const API_BASE = "http://localhost:8000"; // <-- change to your backend
+const map = L.map('map').setView([24.7, 46.7], 12);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+let shape = "polygon";
+let polygonPts = [];
+let polygonLayer = null;
+let circleLayer = null;
+let rectStart=null, rectEnd=null, rectLayer=null;
+let semiCenter=null;
+
+document.getElementById('shape').onchange = e => {
+  shape = e.target.value;
+  polygonPts=[]; rectStart=rectEnd=null; semiCenter=null;
+  if (polygonLayer) map.removeLayer(polygonLayer);
+  if (circleLayer) map.removeLayer(circleLayer);
+  if (rectLayer) map.removeLayer(rectLayer);
+};
+
+map.on('click', e => {
+  if (shape==="polygon") {
+    polygonPts.push([e.latlng.lng, e.latlng.lat]);
+    if (polygonLayer) map.removeLayer(polygonLayer);
+    polygonLayer = L.polygon(polygonPts.map(p=>[p[1],p[0]]), {color:'green'}).addTo(map);
+  } else if (shape==="circle") {
+    const r = Number(document.getElementById('radius').value);
+    if (circleLayer) map.removeLayer(circleLayer);
+    circleLayer = L.circle(e.latlng, {radius:r, color:'blue'}).addTo(map);
+    semiCenter = e.latlng;
+  } else if (shape==="rectangle") {
+    if (!rectStart) rectStart = e.latlng;
+    else rectEnd = e.latlng;
+    if (rectStart && rectEnd) {
+      if (rectLayer) map.removeLayer(rectLayer);
+      rectLayer = L.rectangle([rectStart, rectEnd], {color:'orange'}).addTo(map);
+    }
+  } else if (shape==="semicircle") {
+    const r = Number(document.getElementById('radius').value);
+    if (circleLayer) map.removeLayer(circleLayer);
+    circleLayer = L.circle(e.latlng, {radius:r, color:'purple'}).addTo(map);
+    semiCenter = e.latlng;
+  }
+});
+
+document.getElementById('save').onclick = async () => {
+  let payload;
+  if (shape==="polygon") {
+    if (polygonPts.length<3) return alert("Need 3+ points");
+    const coords = [...polygonPts, polygonPts[0]];
+    payload = {name:"Web Field", shape:"polygon", data:{boundary_geojson:{type:"Polygon", coordinates:[coords]}}};
+  } else if (shape==="circle") {
+    const r = Number(document.getElementById('radius').value);
+    payload = {name:"Web Circle", shape:"circle", data:{center_lat:semiCenter.lat, center_lon:semiCenter.lng, radius_m:r}};
+  } else if (shape==="rectangle") {
+    if (!rectStart || !rectEnd) return alert("Click 2 corners");
+    payload = {name:"Web Rect", shape:"rectangle", data:{lat1:rectStart.lat, lon1:rectStart.lng, lat2:rectEnd.lat, lon2:rectEnd.lng}};
+  } else {
+    const r = Number(document.getElementById('radius').value);
+    const dir = document.getElementById('direction').value;
+    payload = {name:"Web Semi", shape:"semicircle", data:{center_lat:semiCenter.lat, center_lon:semiCenter.lng, radius_m:r, direction:dir}};
+  }
+
+  const res = await fetch(`${API_BASE}/fields/`, {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify(payload)
+  });
+  const txt = await res.text();
+  alert(res.ok ? "Saved!" : txt);
+};
+</script>
+</body>
+</html>

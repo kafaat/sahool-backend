@@ -1,0 +1,48 @@
+version: "3.9"
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: sahool
+      POSTGRES_PASSWORD: sahool
+      POSTGRES_DB: sahool
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+
+  api:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      DATABASE_URL: postgresql+psycopg2://sahool:sahool@db:5432/sahool
+      REDIS_URL: redis://redis:6379/0
+      CDSE_USER: ${CDSE_USER}
+      CDSE_PASS: ${CDSE_PASS}
+      STORAGE_ROOT: ${STORAGE_ROOT}
+    volumes:
+      - .:/code
+      - ./storage:/code/storage
+    ports: ["8000:8000"]
+    depends_on: [db, redis]
+    restart: unless-stopped
+
+  worker:
+    build: .
+    command: celery -A app.workers.celery_app.celery worker --loglevel=INFO
+    environment:
+      DATABASE_URL: postgresql+psycopg2://sahool:sahool@db:5432/sahool
+      REDIS_URL: redis://redis:6379/0
+      CDSE_USER: ${CDSE_USER}
+      CDSE_PASS: ${CDSE_PASS}
+      STORAGE_ROOT: ${STORAGE_ROOT}
+    volumes:
+      - .:/code
+      - ./storage:/code/storage
+    depends_on: [db, redis]
+    restart: unless-stopped
+
+volumes:
+  pgdata:
